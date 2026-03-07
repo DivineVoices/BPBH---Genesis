@@ -28,6 +28,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float runSpeed = 5f;
     [SerializeField] private float mass = 1f;
     [SerializeField] private float Width, Height;
+    [SerializeField] private float jumpForce = 5f;
 
 
     private Vector2 moveDirection = Vector2.zero;
@@ -39,7 +40,7 @@ public class PlayerController : MonoBehaviour
     [Header("Checks")]
     [SerializeField] private float groundCheckDistance = 0.3f;
     [SerializeField] private LayerMask groundMask;
-    [SerializeField] private bool isGrounded = false;
+    [SerializeField] private bool isGrounded = true;
 
     // Input System
     [HideInInspector] public InputSystem_Actions inputActions;
@@ -122,9 +123,9 @@ public class PlayerController : MonoBehaviour
         {
             animator.SetBool("IsWalking", false);
         }
-            
-        CalculateVerticalVelocity();
 
+        HandleJump();
+        CalculateVerticalVelocity();
         controller.Move(new Vector3(0, verticalVelocity, 0) * Time.deltaTime);
 
         // Rotation towards movement direction
@@ -139,18 +140,25 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void CalculateVerticalVelocity()
+    private void HandleJump()
     {
-        if (isGrounded)
+        if (isGrounded && inputActions.Player.Jump.WasPressedThisFrame())
         {
-            verticalVelocity = -0.5f; // small negative value to keep grounded
+            verticalVelocity = jumpForce;
+            animator.SetTrigger("Jump");
         }
-
-        // appliquer gravité
-        verticalVelocity = Physics.gravity.y * mass * Time.deltaTime;
-
     }
 
+    private void CalculateVerticalVelocity()
+    {
+        if (isGrounded && verticalVelocity < 0)
+        {
+            verticalVelocity = -2f; // keeps the player grounded
+        }
+
+        // apply gravity over time
+        verticalVelocity += Physics.gravity.y * mass * Time.deltaTime;
+    }
     private void UpdateGroundedState()
     {
         // Le CharacterController capsule démarre à controller.center

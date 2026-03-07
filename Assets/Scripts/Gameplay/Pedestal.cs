@@ -1,9 +1,12 @@
+using Unity.Cinemachine;
 using UnityEngine;
 
 public class Pedestal : MonoBehaviour, IInteractable
 {
     [SerializeField] private GameObject teleportLocation;
     [SerializeField] private GameObject playerObject;
+    [SerializeField] private CamSwitcher camSwitcher;
+
     public void OnInteract()
     {
         Debug.Log("Interact Logged");
@@ -11,5 +14,6 @@ public class Pedestal : MonoBehaviour, IInteractable
         controller.enabled = false;
         playerObject.transform.position = teleportLocation.transform.position;
         controller.enabled = true;
+        camSwitcher.SwitchToCam(1, true);
     }
 }
