@@ -8,6 +8,7 @@ TagManager:
   - ShaderPedestal
   - Enemy
   - WallJump
+  - Pipe
   layers:
   - Default
   - TransparentFX

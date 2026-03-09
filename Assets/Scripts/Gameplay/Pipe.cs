@@ -1,13 +1,16 @@
 using UnityEngine;
 
-public class Pipe : MonoBehaviour
+public class Pipe : MonoBehaviour, IInteractable
 {
     [SerializeField] private Transform exitPipe;
-    [SerializeField] private float activationRange = 2f;
+    [SerializeField] private GameObject playerObject;
 
-    public bool CanEnter(Transform player)
+    public void OnInteract()
     {
-        return Vector3.Distance(player.position, transform.position) <= activationRange;
+        CharacterController controller = playerObject.GetComponent<CharacterController>();
+        controller.enabled = false;
+        playerObject.transform.position = exitPipe.position;
+        controller.enabled = true;
     }
 
     public Transform GetExit()

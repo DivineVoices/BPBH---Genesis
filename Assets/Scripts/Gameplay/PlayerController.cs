@@ -21,9 +21,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private LayerMask interactLayerMask;
     [SerializeField] float interactDetectionRange = 5f;
 
-
-    // -- Movement States --
-
     [Header("Player Settings")]
     [SerializeField] private float walkSpeed = 2f;
     [SerializeField] private float runSpeed = 5f;
@@ -60,7 +57,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private LayerMask groundMask;
     [SerializeField] private bool isGrounded = true;
 
-    // Input System
     [HideInInspector] public InputSystem_Actions inputActions;
 
     [SerializeField] private Button respawnButton;
@@ -97,7 +93,6 @@ public class PlayerController : MonoBehaviour
         HandleLooking();
         HandleInteract();
         CheckWall();
-        HandlePipe();
 
         if (wallJumpLockTimer > 0f)
             wallJumpLockTimer -= Time.deltaTime;
@@ -235,7 +230,6 @@ public class PlayerController : MonoBehaviour
         wallNormal = Vector3.zero;
     }
 
-    // ---- Looking Handling ----
     private void HandleLooking()
     {
     }
@@ -254,6 +248,11 @@ public class PlayerController : MonoBehaviour
                         interactable = closestInteractable.GetComponent<IInteractable>();
                         interactable?.OnInteract();
                         Debug.Log("Pedestal");
+                        break;
+                    case "Pipe":
+                        interactable = closestInteractable.GetComponent<IInteractable>();
+                        interactable?.OnInteract();
+                        Debug.Log("Pipe");
                         break;
                     case "Untagged":
                         Debug.Log("Nothing");
@@ -319,29 +318,6 @@ public class PlayerController : MonoBehaviour
     {
         verticalVelocity = force;
         animator.SetTrigger("Jump");
-    }
-
-    void HandlePipe()
-    {
-        if (!inputActions.Player.Crouch.WasPressedThisFrame())
-            return;
-
-        Debug.Log("Enterred");
-        Collider[] hits = Physics.OverlapSphere(transform.position, pipeDetectionRange, pipeMask);
-
-        foreach (Collider hit in hits)
-        {
-            Pipe pipe = hit.GetComponent<Pipe>();
-
-            if (pipe != null && pipe.CanEnter(transform))
-            {
-                Transform exit = pipe.GetExit();
-                controller.enabled = false;
-                transform.position = exit.position + new Vector3(0, 2, 0);
-                controller.enabled = true;
-                break;
-            }
-        }
     }
 
     public void RespawnPlayer()
