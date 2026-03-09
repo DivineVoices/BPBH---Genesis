@@ -32,24 +32,28 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 5f;
     [SerializeField] private bool doubleJumped = false;
     [SerializeField] private float wallCheckDistance = 0.6f;
-    //[SerializeField] private TagHandle wallMask;
     [SerializeField] private float wallJumpForce = 6f;
     [SerializeField] private float wallPushForce = 6f;
     [SerializeField] private LayerMask pipeMask;
     [SerializeField] private float pipeDetectionRange = 2f;
     [SerializeField] private MovementMode currentMode = MovementMode.Free3D;
 
+    [Header("Wall Jump Settings")]
+    [SerializeField] private float wallJumpLockDuration = 0.2f;
+
     private bool isTouchingWall;
     private Vector3 wallNormal;
     private Vector3 sideScrollAxis = Vector3.right;
     private Vector3 sideScrollCameraForward;
+
+    private Vector3 wallHorizontalVelocity = Vector3.zero;
+    private float wallJumpLockTimer = 0f;
 
     [SerializeField] private GameObject LastCheckPoint;
 
     private Vector2 moveDirection = Vector2.zero;
     private bool isRunning = false;
     [SerializeField] private float verticalVelocity = 0f;
-    [SerializeField] private float horizontalVelocity = 0f;
 
     [Header("Checks")]
     [SerializeField] private float groundCheckDistance = 0.3f;
@@ -70,7 +74,6 @@ public class PlayerController : MonoBehaviour
         animator = GetComponentInChildren<Animator>();
         inputActions = new InputSystem_Actions();
         camTransform = Camera.main.transform;
-
     }
 
     private void Start()
@@ -85,7 +88,6 @@ public class PlayerController : MonoBehaviour
     private void OnDestroy()
     {
         inputActions.Disable();
-
     }
 
     private void Update()
@@ -96,13 +98,13 @@ public class PlayerController : MonoBehaviour
         HandleInteract();
         CheckWall();
         HandlePipe();
-    }
 
-    // ---- Movement Handling ----
+        if (wallJumpLockTimer > 0f)
+            wallJumpLockTimer -= Time.deltaTime;
+    }
 
     private void HandleMovement()
     {
-
         moveDirection = inputActions.Player.Move.ReadValue<Vector2>();
 
         Vector3 move;
@@ -126,76 +128,55 @@ public class PlayerController : MonoBehaviour
 
         isRunning = inputActions.Player.Sprint.IsPressed();
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
-        if (isRunning && move != Vector3.zero)
-        {
-            animator.SetBool("IsRunning", true);
-        }
-        else
-        {
-            animator.SetBool("IsRunning", false);
-        }
 
-        controller.Move(move * currentSpeed * Time.deltaTime);
-        if (move != Vector3.zero)
-        {
-            animator.SetBool("IsWalking", true);
-        }
-        else
-        {
-            animator.SetBool("IsWalking", false);
-        }
+        animator.SetBool("IsRunning", isRunning && move != Vector3.zero);
+        animator.SetBool("IsWalking", move != Vector3.zero);
+
+        CalculateVerticalVelocity();
+        HandleJump();
+
+        if (wallJumpLockTimer <= 0f)
+            wallHorizontalVelocity = Vector3.Lerp(wallHorizontalVelocity, Vector3.zero, Time.deltaTime * 5f);
+
         Vector3 finalMovement;
 
-        if (isTouchingWall && !isGrounded)
-        {
-            Vector3 slideDirection = Vector3.ProjectOnPlane(move, wallNormal);
-            finalMovement = slideDirection * currentSpeed + Vector3.up * verticalVelocity;
-        }
-        else
-        {
-            finalMovement = move * currentSpeed + Vector3.up * verticalVelocity;
-        }
+        finalMovement = move * currentSpeed + wallHorizontalVelocity + Vector3.up * verticalVelocity;
 
         controller.Move(finalMovement * Time.deltaTime);
-        HandleJump();
-        CalculateVerticalVelocity();
 
-        // Rotation towards movement direction
-        if (move.sqrMagnitude > 0.001f)
+        Vector3 lookDir = (wallHorizontalVelocity.sqrMagnitude > 0.5f) ? wallHorizontalVelocity : move;
+        if (lookDir.sqrMagnitude > 0.001f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(move);
-            transform.rotation = Quaternion.Slerp(
-            transform.rotation,
-            targetRotation,
-            Time.deltaTime * 10f
-            );
+            Quaternion targetRotation = Quaternion.LookRotation(lookDir);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f);
         }
     }
 
     private void HandleJump()
     {
-        if (inputActions.Player.Jump.WasPressedThisFrame())
-        {
-            if (isGrounded)
-            {
-                verticalVelocity = jumpForce;
-                doubleJumped = false;
-                animator.SetTrigger("Jump");
-            }
-            else if (isTouchingWall)
-            {
-                verticalVelocity = wallJumpForce;
+        if (!inputActions.Player.Jump.WasPressedThisFrame())
+            return;
 
-                Vector3 pushDir = wallNormal;
-                horizontalVelocity = /*pushDir * */wallPushForce; 
-                animator.SetTrigger("Jump");
-            }
-            else if (!doubleJumped)
-            {
-                verticalVelocity = jumpForce * 1.5f;
-                doubleJumped = true;
-                animator.SetTrigger("Jump");
-            }
+        if (isGrounded)
+        {
+            verticalVelocity = jumpForce;
+            doubleJumped = false;
+            wallHorizontalVelocity = Vector3.zero;
+            animator.SetTrigger("Jump");
+        }
+        else if (isTouchingWall && wallJumpLockTimer <= 0f)
+        {
+            verticalVelocity = wallJumpForce;
+            wallHorizontalVelocity = wallNormal * wallPushForce;
+            doubleJumped = false;
+            wallJumpLockTimer = wallJumpLockDuration;
+            animator.SetTrigger("Jump");
+        }
+        else if (!doubleJumped)
+        {
+            verticalVelocity = jumpForce * 1.5f;
+            doubleJumped = true;
+            animator.SetTrigger("Jump");
         }
     }
 
@@ -203,25 +184,55 @@ public class PlayerController : MonoBehaviour
     {
         if (isGrounded && verticalVelocity < 0)
         {
-            verticalVelocity = -2f; // keeps the player grounded
+            verticalVelocity = -2f; // Keeps the player grounded
+            wallHorizontalVelocity = Vector3.zero;
         }
 
-        // apply gravity over time
+        // Apply gravity over time
         verticalVelocity += Physics.gravity.y * mass * Time.deltaTime;
     }
+
     private void UpdateGroundedState()
     {
-        // Le CharacterController capsule démarre à controller.center
         Vector3 origin = transform.position + controller.center;
         float radius = controller.radius * 0.9f;
         float distance = groundCheckDistance;
 
-        // SphereCast pour detecter le sol
         isGrounded = Physics.SphereCast(origin, radius, Vector3.down, out RaycastHit hit, distance, groundMask);
         if (isGrounded)
         {
             doubleJumped = false;
         }
+    }
+
+    void CheckWall()
+    {
+        //Prevents instantly re-grabbing
+        if (wallJumpLockTimer > 0f)
+        {
+            isTouchingWall = false;
+            return;
+        }
+
+        Vector3[] directions = new Vector3[]
+        {
+            transform.forward,
+            -transform.forward,
+        };
+
+        foreach (Vector3 dir in directions)
+        {
+            if (Physics.Raycast(transform.position, dir, out RaycastHit hit, wallCheckDistance)
+                && hit.collider.CompareTag("WallJump"))
+            {
+                isTouchingWall = true;
+                wallNormal = hit.normal;
+                return;
+            }
+        }
+
+        isTouchingWall = false;
+        wallNormal = Vector3.zero;
     }
 
     // ---- Looking Handling ----
@@ -249,7 +260,6 @@ public class PlayerController : MonoBehaviour
                         break;
                 }
             }
-            
         }
     }
 
@@ -257,14 +267,12 @@ public class PlayerController : MonoBehaviour
     {
         if (controller == null)
             controller = GetComponent<CharacterController>();
-        // Le CharacterController capsule démarre à controller.center
         Vector3 origin = transform.position + controller.center;
         float radius = controller.radius * 0.9f;
         float distance = groundCheckDistance;
         Gizmos.color = isGrounded ? Color.green : Color.red;
         Gizmos.DrawWireSphere(origin + Vector3.down * distance, radius);
     }
-
 
     public void FreezeDialogueControls()
     {
@@ -282,7 +290,6 @@ public class PlayerController : MonoBehaviour
         if (image == null)
             return;
 
-        // Stop any previous fade on this image
         if (SetAlphaRoutine != null)
             StopCoroutine(SetAlphaRoutine);
 
@@ -293,21 +300,17 @@ public class PlayerController : MonoBehaviour
     {
         float startAlpha = image.color.a;
         float time = 0f;
-
         Color c = image.color;
 
         while (time < duration)
         {
             time += Time.deltaTime;
             float t = time / duration;
-
             c.a = Mathf.Lerp(startAlpha, targetAlpha, t);
             image.color = c;
-
             yield return null;
         }
 
-        // Ensure exact final value
         c.a = targetAlpha;
         image.color = c;
     }
@@ -316,21 +319,6 @@ public class PlayerController : MonoBehaviour
     {
         verticalVelocity = force;
         animator.SetTrigger("Jump");
-    }
-
-    void CheckWall()
-    {
-        RaycastHit hit;
-
-        if (Physics.Raycast(transform.position, transform.forward, out hit, wallCheckDistance) && hit.collider.CompareTag("WallJump"))
-        {
-            isTouchingWall = true;
-            wallNormal = hit.normal;
-        }
-        else
-        {
-            isTouchingWall = false;
-        }
     }
 
     void HandlePipe()
@@ -348,11 +336,9 @@ public class PlayerController : MonoBehaviour
             if (pipe != null && pipe.CanEnter(transform))
             {
                 Transform exit = pipe.GetExit();
-
                 controller.enabled = false;
                 transform.position = exit.position + new Vector3(0, 2, 0);
                 controller.enabled = true;
-
                 break;
             }
         }
