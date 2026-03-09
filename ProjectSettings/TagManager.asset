@@ -7,6 +7,7 @@ TagManager:
   - CinemachineTarget
   - ShaderPedestal
   - Enemy
+  - WallJump
   layers:
   - Default
   - TransparentFX

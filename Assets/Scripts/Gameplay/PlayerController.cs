@@ -32,7 +32,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 5f;
     [SerializeField] private bool doubleJumped = false;
     [SerializeField] private float wallCheckDistance = 0.6f;
-    [SerializeField] private LayerMask wallMask;
+    //[SerializeField] private TagHandle wallMask;
     [SerializeField] private float wallJumpForce = 6f;
     [SerializeField] private float wallPushForce = 6f;
     [SerializeField] private LayerMask pipeMask;
@@ -49,6 +49,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 moveDirection = Vector2.zero;
     private bool isRunning = false;
     [SerializeField] private float verticalVelocity = 0f;
+    [SerializeField] private float horizontalVelocity = 0f;
 
     [Header("Checks")]
     [SerializeField] private float groundCheckDistance = 0.3f;
@@ -143,10 +144,21 @@ public class PlayerController : MonoBehaviour
         {
             animator.SetBool("IsWalking", false);
         }
+        Vector3 finalMovement;
 
+        if (isTouchingWall && !isGrounded)
+        {
+            Vector3 slideDirection = Vector3.ProjectOnPlane(move, wallNormal);
+            finalMovement = slideDirection * currentSpeed + Vector3.up * verticalVelocity;
+        }
+        else
+        {
+            finalMovement = move * currentSpeed + Vector3.up * verticalVelocity;
+        }
+
+        controller.Move(finalMovement * Time.deltaTime);
         HandleJump();
         CalculateVerticalVelocity();
-        controller.Move(new Vector3(0, verticalVelocity, 0) * Time.deltaTime);
 
         // Rotation towards movement direction
         if (move.sqrMagnitude > 0.001f)
@@ -175,8 +187,7 @@ public class PlayerController : MonoBehaviour
                 verticalVelocity = wallJumpForce;
 
                 Vector3 pushDir = wallNormal;
-                controller.Move(pushDir * wallPushForce * Time.deltaTime);
-
+                horizontalVelocity = /*pushDir * */wallPushForce; 
                 animator.SetTrigger("Jump");
             }
             else if (!doubleJumped)
@@ -311,7 +322,7 @@ public class PlayerController : MonoBehaviour
     {
         RaycastHit hit;
 
-        if (Physics.Raycast(transform.position, transform.forward, out hit, wallCheckDistance, wallMask))
+        if (Physics.Raycast(transform.position, transform.forward, out hit, wallCheckDistance) && hit.collider.CompareTag("WallJump"))
         {
             isTouchingWall = true;
             wallNormal = hit.normal;
