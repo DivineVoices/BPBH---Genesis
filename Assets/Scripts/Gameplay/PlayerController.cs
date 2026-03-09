@@ -10,6 +10,7 @@ public class PlayerController : MonoBehaviour
 {
     private Transform camTransform;
     private CharacterController controller;
+    public enum MovementMode { Free3D, SideScroller }
 
     private Animator animator;
 
@@ -36,17 +37,18 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float wallPushForce = 6f;
     [SerializeField] private LayerMask pipeMask;
     [SerializeField] private float pipeDetectionRange = 2f;
+    [SerializeField] private MovementMode currentMode = MovementMode.Free3D;
 
     private bool isTouchingWall;
     private Vector3 wallNormal;
+    private Vector3 sideScrollAxis = Vector3.right;
+    private Vector3 sideScrollCameraForward;
 
     [SerializeField] private GameObject LastCheckPoint;
 
     private Vector2 moveDirection = Vector2.zero;
     private bool isRunning = false;
     [SerializeField] private float verticalVelocity = 0f;
-
-    
 
     [Header("Checks")]
     [SerializeField] private float groundCheckDistance = 0.3f;
@@ -102,18 +104,23 @@ public class PlayerController : MonoBehaviour
 
         moveDirection = inputActions.Player.Move.ReadValue<Vector2>();
 
-        // Camera-relative movement
-        Vector3 camForward = camTransform.forward;
-        Vector3 camRight = camTransform.right;
+        Vector3 move;
 
-        // Flatten camera vectors (no vertical influence)
-        camForward.y = 0f;
-        camRight.y = 0f;
+        if (currentMode == MovementMode.SideScroller)
+        {
+            move = -sideScrollAxis * moveDirection.x;
+        }
+        else
+        {
+            Vector3 camForward = camTransform.forward;
+            Vector3 camRight = camTransform.right;
+            camForward.y = 0f;
+            camRight.y = 0f;
+            camForward.Normalize();
+            camRight.Normalize();
+            move = camForward * moveDirection.y + camRight * moveDirection.x;
+        }
 
-        camForward.Normalize();
-        camRight.Normalize();
-
-        Vector3 move = camForward * moveDirection.y + camRight * moveDirection.x;
         move.Normalize();
 
         isRunning = inputActions.Player.Sprint.IsPressed();
@@ -314,6 +321,7 @@ public class PlayerController : MonoBehaviour
             isTouchingWall = false;
         }
     }
+
     void HandlePipe()
     {
         if (!inputActions.Player.Crouch.WasPressedThisFrame())
@@ -349,5 +357,15 @@ public class PlayerController : MonoBehaviour
     public void ChangeCheckPoint(GameObject newCheckPoint)
     {
         LastCheckPoint = newCheckPoint;
+    }
+
+    public void SetMovementMode(MovementMode newMode, Vector3? axis = null)
+    {
+        currentMode = newMode;
+
+        if (newMode == MovementMode.SideScroller && axis.HasValue)
+        {
+            sideScrollAxis = axis.Value.normalized;
+        }
     }
 }

@@ -16,6 +16,8 @@ public class Pedestal : MonoBehaviour, IInteractable
         playerObject.transform.position = teleportLocation.transform.position;
         controller.enabled = true;
         camSwitcher.SwitchToCam(1, true);
+        PlayerController player = playerObject.GetComponent<PlayerController>();
+        player.SetMovementMode(PlayerController.MovementMode.SideScroller);
 
         if (shadowPuppet != null)
         {
