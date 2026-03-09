@@ -40,7 +40,7 @@ public class PlayerController : MonoBehaviour
     private bool isTouchingWall;
     private Vector3 wallNormal;
 
-
+    [SerializeField] private GameObject LastCheckPoint;
 
     private Vector2 moveDirection = Vector2.zero;
     private bool isRunning = false;
@@ -174,7 +174,7 @@ public class PlayerController : MonoBehaviour
             }
             else if (!doubleJumped)
             {
-                verticalVelocity = jumpForce;
+                verticalVelocity = jumpForce * 1.5f;
                 doubleJumped = true;
                 animator.SetTrigger("Jump");
             }
@@ -331,11 +331,23 @@ public class PlayerController : MonoBehaviour
                 Transform exit = pipe.GetExit();
 
                 controller.enabled = false;
-                transform.position = exit.position;
+                transform.position = exit.position + new Vector3(0, 2, 0);
                 controller.enabled = true;
 
                 break;
             }
         }
+    }
+
+    public void RespawnPlayer()
+    {
+        controller.enabled = false;
+        transform.position = LastCheckPoint.gameObject.transform.position;
+        controller.enabled = true;
+    }
+
+    public void ChangeCheckPoint(GameObject newCheckPoint)
+    {
+        LastCheckPoint = newCheckPoint;
     }
 }

@@ -6,6 +6,7 @@ public class Pedestal : MonoBehaviour, IInteractable
     [SerializeField] private GameObject teleportLocation;
     [SerializeField] private GameObject playerObject;
     [SerializeField] private CamSwitcher camSwitcher;
+    [SerializeField] private ShadowPuppet shadowPuppet;
 
     public void OnInteract()
     {
@@ -15,5 +16,11 @@ public class Pedestal : MonoBehaviour, IInteractable
         playerObject.transform.position = teleportLocation.transform.position;
         controller.enabled = true;
         camSwitcher.SwitchToCam(1, true);
+
+        if (shadowPuppet != null)
+        {
+            ShadowRecorder.Instance.StartRecording();
+            shadowPuppet.StartReplaying();
+        }
     }
 }
