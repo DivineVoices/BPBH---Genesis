@@ -29,7 +29,18 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float mass = 1f;
     [SerializeField] private float Width, Height;
     [SerializeField] private float jumpForce = 5f;
+    [SerializeField] private bool doubleJumped = false;
+    [SerializeField] private float wallCheckDistance = 0.6f;
+    [SerializeField] private LayerMask wallMask;
+    [SerializeField] private float wallJumpForce = 6f;
+    [SerializeField] private float wallPushForce = 6f;
+    [SerializeField] private LayerMask pipeMask;
+    [SerializeField] private float pipeDetectionRange = 2f;
 
+    private bool isTouchingWall;
+    private Vector3 wallNormal;
+
+    [SerializeField] private GameObject LastCheckPoint;
 
     private Vector2 moveDirection = Vector2.zero;
     private bool isRunning = false;
@@ -80,6 +91,8 @@ public class PlayerController : MonoBehaviour
         HandleMovement();
         HandleLooking();
         HandleInteract();
+        CheckWall();
+        HandlePipe();
     }
 
     // ---- Movement Handling ----
@@ -142,10 +155,29 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJump()
     {
-        if (isGrounded && inputActions.Player.Jump.WasPressedThisFrame())
+        if (inputActions.Player.Jump.WasPressedThisFrame())
         {
-            verticalVelocity = jumpForce;
-            animator.SetTrigger("Jump");
+            if (isGrounded)
+            {
+                verticalVelocity = jumpForce;
+                doubleJumped = false;
+                animator.SetTrigger("Jump");
+            }
+            else if (isTouchingWall)
+            {
+                verticalVelocity = wallJumpForce;
+
+                Vector3 pushDir = wallNormal;
+                controller.Move(pushDir * wallPushForce * Time.deltaTime);
+
+                animator.SetTrigger("Jump");
+            }
+            else if (!doubleJumped)
+            {
+                verticalVelocity = jumpForce * 1.5f;
+                doubleJumped = true;
+                animator.SetTrigger("Jump");
+            }
         }
     }
 
@@ -168,6 +200,10 @@ public class PlayerController : MonoBehaviour
 
         // SphereCast pour detecter le sol
         isGrounded = Physics.SphereCast(origin, radius, Vector3.down, out RaycastHit hit, distance, groundMask);
+        if (isGrounded)
+        {
+            doubleJumped = false;
+        }
     }
 
     // ---- Looking Handling ----
@@ -258,4 +294,60 @@ public class PlayerController : MonoBehaviour
         image.color = c;
     }
 
+    public void Bounce(float force)
+    {
+        verticalVelocity = force;
+        animator.SetTrigger("Jump");
+    }
+
+    void CheckWall()
+    {
+        RaycastHit hit;
+
+        if (Physics.Raycast(transform.position, transform.forward, out hit, wallCheckDistance, wallMask))
+        {
+            isTouchingWall = true;
+            wallNormal = hit.normal;
+        }
+        else
+        {
+            isTouchingWall = false;
+        }
+    }
+    void HandlePipe()
+    {
+        if (!inputActions.Player.Crouch.WasPressedThisFrame())
+            return;
+
+        Debug.Log("Enterred");
+        Collider[] hits = Physics.OverlapSphere(transform.position, pipeDetectionRange, pipeMask);
+
+        foreach (Collider hit in hits)
+        {
+            Pipe pipe = hit.GetComponent<Pipe>();
+
+            if (pipe != null && pipe.CanEnter(transform))
+            {
+                Transform exit = pipe.GetExit();
+
+                controller.enabled = false;
+                transform.position = exit.position + new Vector3(0, 2, 0);
+                controller.enabled = true;
+
+                break;
+            }
+        }
+    }
+
+    public void RespawnPlayer()
+    {
+        controller.enabled = false;
+        transform.position = LastCheckPoint.gameObject.transform.position;
+        controller.enabled = true;
+    }
+
+    public void ChangeCheckPoint(GameObject newCheckPoint)
+    {
+        LastCheckPoint = newCheckPoint;
+    }
 }
